@@ -38,6 +38,49 @@
 (require 'helm)
 
 ;; Interface implementation
+(defvar flyspell-correct-helm-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map helm-map)
+    (define-key map (kbd "C-1") #'flyspell-correct-helm-save)
+    (define-key map (kbd "C-2") #'flyspell-correct-helm-session)
+    (define-key map (kbd "C-3") #'flyspell-correct-helm-buffer)
+    (define-key map (kbd "C-4") #'flyspell-correct-helm-skip)
+    (define-key map (kbd "C-5") #'flyspell-correct-helm-stop)
+    map)
+  "Keymap for ‘flyspell-correct-helm’.")
+
+(defvar flyspell-correct-helm-mode-line-string "\
+\\<flyspell-correct-helm-map>\
+\\[flyspell-correct-helm-save]:Save \
+\\[flyspell-correct-helm-session]:Accept (s) \
+\\[flyspell-correct-helm-buffer]:Accept (b) \
+\\[flyspell-correct-helm-skip]:Skip \
+\\[flyspell-correct-helm-stop]:Stop"
+  "Mode-line string for ‘flyspell-correct-helm’.")
+
+(defvar flyspell-correct-helm-current-word nil
+  "Current word to be corrected.")
+
+(defun flyspell-correct-helm-save ()
+  "Save current word."
+  (interactive)
+  (helm-run-after-exit #'cons 'save flyspell-correct-helm-current-word))
+(defun flyspell-correct-helm-session ()
+  "Accept (session) current word."
+  (interactive)
+  (helm-run-after-exit #'cons 'session flyspell-correct-helm-current-word))
+(defun flyspell-correct-helm-buffer ()
+  "Accept (buffer) current word."
+  (interactive)
+  (helm-run-after-exit #'cons 'buffer flyspell-correct-helm-current-word))
+(defun flyspell-correct-helm-skip ()
+  "Skip current word."
+  (interactive)
+  (helm-run-after-exit #'cons 'skip flyspell-correct-helm-current-word))
+(defun flyspell-correct-helm-stop ()
+  "Stop at current word."
+  (interactive)
+  (helm-run-after-exit #'cons 'stop flyspell-correct-helm-current-word))
 
 (defun flyspell-correct-helm--always-match (_)
   "Return non-nil for any CANDIDATE."
@@ -73,24 +116,27 @@ List of CANDIDATES is given by flyspell for the WORD.
 
 Return a selected word to use as a replacement or a tuple
 of (command, word) to be used by `flyspell-do-correct'."
-  (helm :sources (list (helm-build-sync-source
-                           (format "Suggestions for \"%s\" in dictionary \"%s\""
-                                   word (or ispell-local-dictionary
-                                            ispell-dictionary
-                                            "Default"))
-                         :candidates candidates
-                         :action 'identity
-                         :candidate-number-limit 9999
-                         :fuzzy-match t)
-                       (helm-build-sync-source "Options"
-                         :candidates (lambda ()
-                                       (flyspell-correct-helm--option-candidates word))
-                         :action 'identity
-                         :candidate-number-limit 9999
-                         :match 'flyspell-correct-helm--always-match
-                         :volatile t))
-        :buffer "*Helm Flyspell*"
-        :prompt "Correction: "))
+  (let ((flyspell-correct-helm-current-word word))
+    (helm :sources (list (helm-build-sync-source
+                             (format "Suggestions for \"%s\" in dictionary \"%s\""
+                                     word (or ispell-local-dictionary
+                                              ispell-dictionary
+                                              "Default"))
+                           :candidates candidates
+                           :action 'identity
+                           :fuzzy-match t
+                           :keymap 'flyspell-correct-helm-map
+                           :mode-line 'flyspell-correct-helm-mode-line-string)
+                         (helm-build-sync-source "Options"
+                           :candidates (lambda ()
+                                         (flyspell-correct-helm--option-candidates word))
+                           :action 'identity
+                           :match 'flyspell-correct-helm--always-match
+                           :volatile t
+                           :keymap 'flyspell-correct-helm-map
+                           :mode-line 'flyspell-correct-helm-mode-line-string))
+          :buffer "*Helm Flyspell*"
+          :prompt "Correction: ")))
 
 (setq flyspell-correct-interface #'flyspell-correct-helm)
 
